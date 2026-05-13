@@ -66,6 +66,15 @@ const AIRCRAFT_LIST = [
     color: '#445533',
     icon: '🚁',
   },
+  {
+    key: 'airbusA350',
+    name: 'Airbus A350-900',
+    category: 'Wide-Body Airliner',
+    description: 'Long-haul wide-body airliner. Twin Rolls-Royce Trent XWB engines. Mach 0.89.',
+    specs: 'Max: 295 m/s • Mass: 150,000 kg • Engines: 2× RR Trent XWB',
+    color: '#003087',
+    icon: '✈',
+  },
 ];
 
 // ── Main Menu ─────────────────────────────────────────────────────────────────
@@ -102,7 +111,7 @@ function MainMenu({ onStart }) {
       {/* Aircraft selection grid */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 200px)',
+        gridTemplateColumns: 'repeat(4, 190px)',
         gap: 12,
         marginBottom: 32,
       }}>
@@ -209,7 +218,7 @@ function MainMenu({ onStart }) {
         letterSpacing: 1,
       }}>
         CONTROLS: WASD = Throttle/Rudder • ARROWS = Pitch/Roll • MOUSE (click canvas) = Fine control<br/>
-        G = Gear • F/C = Flaps • Space = Fire • Tab = Weapon • T = Lock • V = View • 1-7 = Switch aircraft
+        G = Gear • F/C = Flaps • Space = Fire • Tab = Weapon • T = Lock • V = View • 1-8 = Switch aircraft
       </div>
     </div>
   );
