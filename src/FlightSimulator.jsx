@@ -217,7 +217,7 @@ function MainMenu({ onStart }) {
         lineHeight: 1.9,
         letterSpacing: 1,
       }}>
-        CONTROLS: WASD = Throttle/Rudder • ARROWS = Pitch/Roll • MOUSE (click canvas) = Fine control<br/>
+        CONTROLS: W/S = Throttle • ARROWS or MOUSE = Pitch/Roll • A/D = Rudder<br/>
         G = Gear • F/C = Flaps • Space = Fire • Tab = Weapon • T = Lock • V = View • 1-8 = Switch aircraft
       </div>
     </div>

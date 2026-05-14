@@ -192,7 +192,7 @@ export class AircraftPhysics {
     );
 
     // Angular velocity in body frame tracks toward target
-    const angDamp = 3.0;
+    const angDamp = 5.0;
     this.angularVelocity.lerp(targetAngVel, dt * angDamp);
     this.angularVelocity.add(propTorque.multiplyScalar(dt));
 
@@ -205,8 +205,17 @@ export class AircraftPhysics {
     const bankAngle = this.rotation.z;
     this.rotation.y -= Math.sin(bankAngle) * 0.3 * dt;
 
-    // Natural pitch stability: tend to level pitch
-    this.rotation.x *= 0.999;
+    // Auto-level: when no roll input, gently return wings to level
+    if (Math.abs(axes.roll) < 0.05) {
+      this.rotation.z -= this.rotation.z * dt * 2.5;
+    }
+
+    // Natural pitch stability: tend to level pitch when no input
+    if (Math.abs(axes.pitch) < 0.05) {
+      this.rotation.x -= this.rotation.x * dt * 1.5;
+    } else {
+      this.rotation.x *= 0.999;
+    }
 
     // Clamp pitch
     this.rotation.x = clamp(this.rotation.x, -Math.PI / 2.5, Math.PI / 2.5);

@@ -73,7 +73,7 @@ export class SimEngine {
     this._renderer.shadowMap.enabled = true;
     this._renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this._renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this._renderer.toneMappingExposure = 1.0;
+    this._renderer.toneMappingExposure = 1.8;
 
     this._handleResize = () => {
       const w = this._canvas.clientWidth;

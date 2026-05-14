@@ -33,8 +33,9 @@ function lerpColor(a, b, t) {
 export class Environment {
   constructor(scene) {
     this._scene = scene;
-    this._time = 0;        // seconds (0..DAY_CYCLE_SECONDS)
-    this._timeOfDay = 0.4; // 0..1 fraction of day (0.4 = ~10am)
+    // Start at noon so the scene is bright immediately
+    this._time = DAY_CYCLE_SECONDS * 0.5;
+    this._timeOfDay = 0.5;
     this._weather = WeatherState.CLEAR;
 
     this._wind = new THREE.Vector3(2, 0, 1); // base wind
@@ -51,7 +52,7 @@ export class Environment {
   }
 
   _setupLights() {
-    this._sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    this._sunLight = new THREE.DirectionalLight(0xfff8e8, 2.5);
     this._sunLight.castShadow = true;
     this._sunLight.shadow.mapSize.set(2048, 2048);
     this._sunLight.shadow.camera.near = 1;
@@ -62,10 +63,10 @@ export class Environment {
     this._sunLight.shadow.camera.bottom = -2000;
     this._scene.add(this._sunLight);
 
-    this._ambientLight = new THREE.AmbientLight(0x304050, 0.4);
+    this._ambientLight = new THREE.AmbientLight(0xc8d8ff, 1.2);
     this._scene.add(this._ambientLight);
 
-    this._hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x4a6741, 0.3);
+    this._hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x5a7a50, 0.8);
     this._scene.add(this._hemiLight);
   }
 
@@ -176,7 +177,7 @@ export class Environment {
     this._scene.background = skyColor;
     if (this._scene.fog) this._scene.fog.color = skyColor;
     this._ambientLight.color = ambColor;
-    this._sunLight.intensity = Math.max(0, sunIntensity);
+    this._sunLight.intensity = Math.max(0, sunIntensity * 2.5);
     this._hemiLight.skyColor = skyColor;
 
     // Sun position (orbits overhead)
