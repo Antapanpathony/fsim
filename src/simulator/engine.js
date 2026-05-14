@@ -17,6 +17,7 @@ import { B52Config } from './aircraft/b52.js';
 import { RobinsonR44Config } from './aircraft/robinsonR44.js';
 import { F35Config } from './aircraft/f35.js';
 import { AH64Config } from './aircraft/ah64.js';
+import { AirbusA350Config } from './aircraft/airbusA350.js';
 
 const AIRCRAFT_CONFIGS = {
   cessna172: Cessna172Config,
@@ -26,6 +27,7 @@ const AIRCRAFT_CONFIGS = {
   robinsonR44: RobinsonR44Config,
   f35: F35Config,
   ah64: AH64Config,
+  airbusA350: AirbusA350Config,
 };
 
 const AIRCRAFT_KEYS = Object.keys(AIRCRAFT_CONFIGS);
@@ -111,6 +113,8 @@ export class SimEngine {
   }
 
   _spawnAircraft(key) {
+    const isInitialSpawn = !this._aircraft;
+
     // Remove old aircraft mesh
     if (this._aircraft) {
       this._scene.remove(this._aircraft.mesh);
@@ -129,10 +133,19 @@ export class SimEngine {
     const pos = this._physics.position.clone();
     const heading = this._physics.rotation.y;
 
-    // Reset physics with safe altitude
-    const terrainH = this._terrain.getHeightAt(pos.x, pos.z);
-    const safeAlt = Math.max(terrainH + 300, 500);
-    this._physics.reset(new THREE.Vector3(pos.x, safeAlt, pos.z), heading);
+    if (isInitialSpawn) {
+      // Start on the first landing strip, on the ground
+      const strip = this._terrain.getLandingStrips()[0];
+      const sx = strip ? strip.center.x : pos.x;
+      const sz = strip ? strip.center.z : pos.z;
+      const terrainH = this._terrain.getHeightAt(sx, sz);
+      this._physics.reset(new THREE.Vector3(sx, terrainH + 1.5, sz), 0);
+    } else {
+      // Mid-flight switch: keep current position with safe altitude
+      const terrainH = this._terrain.getHeightAt(pos.x, pos.z);
+      const safeAlt = Math.max(terrainH + 300, 500);
+      this._physics.reset(new THREE.Vector3(pos.x, safeAlt, pos.z), heading);
+    }
 
     // Create aircraft
     this._aircraft = new Aircraft(config);
@@ -246,8 +259,8 @@ export class SimEngine {
   _handleSpecialKeys() {
     const input = this._input;
 
-    // Aircraft switch (keys 1-7)
-    const numKeys = ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7'];
+    // Aircraft switch (keys 1-8)
+    const numKeys = ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8'];
     for (let i = 0; i < numKeys.length; i++) {
       if (input.wasJustPressed(numKeys[i])) {
         const key = AIRCRAFT_KEYS[i];
