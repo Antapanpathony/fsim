@@ -226,16 +226,16 @@ export class AircraftPhysics {
       this.position.y = minAlt;
       this.onGround = true;
 
-      // Ground friction and bounce prevention
-      if (this.velocity.y < 0) {
-        // Hard landing detection
-        const impact = Math.abs(this.velocity.y);
-        this.velocity.y = 0;
+      if (this.velocity.y < 0) this.velocity.y = 0;
 
-        // Ground friction
-        const friction = 0.97;
-        this.velocity.x *= friction;
-        this.velocity.z *= friction;
+      // Realistic rolling friction (μ ≈ 0.015 for wheels on tarmac)
+      // Applied as a force-based deceleration, not a per-frame multiplier
+      const horizSpeed = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z);
+      if (horizSpeed > 0.01) {
+        const rollingDecel = 0.015 * 9.81 * dt;  // ≈ 0.147 m/s² — easily overcome by thrust
+        const scale = Math.max(0, 1 - rollingDecel / horizSpeed);
+        this.velocity.x *= scale;
+        this.velocity.z *= scale;
       }
 
       // Level the aircraft on ground
