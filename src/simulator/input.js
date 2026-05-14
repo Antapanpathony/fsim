@@ -40,10 +40,9 @@ export class InputManager {
     });
 
     window.addEventListener('mousemove', (e) => {
-      if (this._pointerLocked) {
-        this._mouseDX += e.movementX;
-        this._mouseDY += e.movementY;
-      }
+      // Accept mouse movement whether pointer-locked or not
+      this._mouseDX += e.movementX;
+      this._mouseDY += e.movementY;
     });
 
     document.addEventListener('pointerlockchange', () => {
@@ -78,24 +77,22 @@ export class InputManager {
     if (this._keys['KeyA']) yaw -= 1;
     if (this._keys['KeyD']) yaw += 1;
 
-    // Mouse input for fine control (when pointer locked)
-    if (this._pointerLocked) {
-      const mouseSensitivity = 0.002;
-      pitch -= this._mouseDY * mouseSensitivity;
-      roll += this._mouseDX * mouseSensitivity;
-    }
+    // Mouse always contributes to pitch/roll
+    const mouseSensitivity = 0.004;
+    pitch -= this._mouseDY * mouseSensitivity;
+    roll  += this._mouseDX * mouseSensitivity;
 
     // Clamp
     this._axes.pitch = Math.max(-1, Math.min(1, pitch));
     this._axes.roll = Math.max(-1, Math.min(1, roll));
     this._axes.yaw = Math.max(-1, Math.min(1, yaw));
 
-    // Throttle: W/S
+    // Throttle: W/S  (faster response)
     if (this._keys['KeyW']) {
-      this._axes.throttle = Math.min(1, this._axes.throttle + 0.005);
+      this._axes.throttle = Math.min(1, this._axes.throttle + 0.015);
     }
     if (this._keys['KeyS']) {
-      this._axes.throttle = Math.max(0, this._axes.throttle - 0.005);
+      this._axes.throttle = Math.max(0, this._axes.throttle - 0.015);
     }
 
     // Gamepad support
