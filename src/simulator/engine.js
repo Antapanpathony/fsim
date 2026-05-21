@@ -52,6 +52,11 @@ export class SimEngine {
     // Parachute state (Cirrus)
     this._parachuteDeployed = false;
 
+    // Autoland state
+    this._autolandActive = false;
+    this._autolandTarget = null;
+    this._autolandThrottle = 0;
+
     // B52 bomb bay
     this._bombBayOpen = false;
     this._bombBayAngle = 0;
@@ -226,7 +231,11 @@ export class SimEngine {
     }
 
     // HUD update
-    this._hud.update(this._physics, this._weaponSystem, this._environment);
+    this._hud.update(
+      this._physics, this._weaponSystem, this._environment,
+      this._autolandActive,
+      this._parachuteDeployed && this._currentAircraftKey === 'cirrusVisionJet'
+    );
 
     // Render
     this._renderer.render(this._scene, this._camera);
@@ -234,7 +243,13 @@ export class SimEngine {
   }
 
   _physicsStep(dt) {
-    const axes = this._input.getAxes();
+    let axes = this._input.getAxes();
+
+    // Autoland overrides pilot input
+    if (this._autolandActive) {
+      axes = this._computeAutolandAxes(axes, dt);
+    }
+
     this._physics.setAxes(axes);
 
     const terrainH = this._terrain.getHeightAt(
@@ -245,6 +260,11 @@ export class SimEngine {
 
     this._physics.update(dt, config, this._environment, terrainH);
 
+    // CAPS: continuously damp velocity while parachute is deployed
+    if (this._parachuteDeployed && this._currentAircraftKey === 'cirrusVisionJet') {
+      this._applyCapsPhysics(dt);
+    }
+
     // Weapon firing
     if (this._input.isPressed('Space')) {
       const forward = new THREE.Vector3(0, 0, -1).applyEuler(this._physics.rotation);
@@ -254,6 +274,102 @@ export class SimEngine {
         this._targetManager.getTargets()
       );
     }
+  }
+
+  _applyCapsPhysics(dt) {
+    const v = this._physics.velocity;
+    // Arrest descent to ≤5 m/s
+    if (v.y < -5) {
+      v.y += (-5 - v.y) * Math.min(1, dt * 4);
+    }
+    // Strong horizontal drag from parachute canopy
+    const horizDecay = Math.pow(0.15, dt);
+    v.x *= horizDecay;
+    v.z *= horizDecay;
+    // Keep wings level
+    this._physics.rotation.x *= Math.pow(0.1, dt);
+    this._physics.rotation.z *= Math.pow(0.1, dt);
+  }
+
+  // Returns axes overridden by the autoland autopilot.
+  // Runway heading = 0 → aircraft approaches from +Z heading toward -Z (heading 0°).
+  _computeAutolandAxes(axes, dt) {
+    const pos = this._physics.position;
+    const strip = this._autolandTarget;
+    const config = AIRCRAFT_CONFIGS[this._currentAircraftKey];
+
+    if (!strip || config.isHelicopter) {
+      this._autolandActive = false;
+      return axes;
+    }
+
+    // Touchdown 200 m north of runway center
+    const tdX = strip.center.x;
+    const tdZ = strip.center.z - 200;
+    const tdY = strip.center.y;
+
+    const dX = tdX - pos.x;
+    const dZ = tdZ - pos.z;
+    const horizDist = Math.sqrt(dX * dX + dZ * dZ);
+    const agl = pos.y - tdY;
+
+    // Sequence complete on touchdown
+    if (this._physics.onGround && horizDist < 600) {
+      this._autolandActive = false;
+      this._input.setThrottle(0);
+      this._hud.showMessage('AUTOLAND COMPLETE', 3000);
+      return { ...axes, pitch: 0, roll: 0, yaw: 0, throttle: 0 };
+    }
+
+    // ── Vertical control (glide slope) ──────────────────────────
+    const glideAngle = 3 * Math.PI / 180;
+    const targetAlt  = tdY + Math.max(0, horizDist * Math.tan(glideAngle));
+    const altError   = targetAlt - pos.y;
+
+    const glideSlopeVS = -this._physics.airspeed * Math.sin(glideAngle);
+    const targetVS     = Math.max(-15, Math.min(3, glideSlopeVS + altError * 0.3));
+    const vsError      = targetVS - this._physics.verticalSpeed;
+
+    let pitchCmd;
+    if (agl < 15) {
+      // Flare: arrest sink rate
+      pitchCmd = Math.max(0, Math.min(0.5, -this._physics.verticalSpeed * 0.08));
+    } else {
+      pitchCmd = Math.max(-0.5, Math.min(0.5, vsError * 0.06));
+    }
+
+    // ── Lateral control (runway centerline) ────────────────────
+    // Bearing to touchdown: atan2(-dX, -dZ) gives correct heading in this sim's convention
+    const desiredHdgDeg = THREE.MathUtils.radToDeg(Math.atan2(-dX, -dZ));
+    const currentHdgSigned = this._physics.heading > 180
+      ? this._physics.heading - 360
+      : this._physics.heading;
+    let hdgError = desiredHdgDeg - currentHdgSigned;
+    while (hdgError >  180) hdgError -= 360;
+    while (hdgError < -180) hdgError += 360;
+    const rollCmd = Math.max(-0.5, Math.min(0.5, hdgError * 0.04));
+
+    // ── Speed control (1.3× stall speed) ───────────────────────
+    const targetSpeed = (config.stallSpeed || 30) * 1.3;
+    const speedError  = targetSpeed - this._physics.airspeed;
+    this._autolandThrottle = Math.max(0, Math.min(1, this._autolandThrottle + speedError * 0.01));
+
+    // ── Cockpit automation ─────────────────────────────────────
+    if (agl < 800 && this._physics.flaps < 2) {
+      this._physics.flaps = 2;
+    }
+    if (agl < 500 && !this._physics.gearDown) {
+      this._physics.gearDown = true;
+      this._hud.showMessage('GEAR DOWN — AUTOLAND', 2000);
+    }
+
+    return {
+      pitch: pitchCmd,
+      roll:  rollCmd,
+      yaw:   0,
+      throttle:   this._autolandThrottle,
+      collective: 0,
+    };
   }
 
   _handleSpecialKeys() {
@@ -321,11 +437,35 @@ export class SimEngine {
       }
     }
 
-    // Parachute (Cirrus)
+    // Autoland toggle (L key — fixed-wing only)
+    if (input.wasJustPressed('KeyL')) {
+      const config = AIRCRAFT_CONFIGS[this._currentAircraftKey];
+      if (config && !config.isHelicopter) {
+        if (!this._autolandActive) {
+          const strips = this._terrain.getLandingStrips();
+          let nearest = null, nearestDist = Infinity;
+          for (const strip of strips) {
+            const d = this._physics.position.distanceTo(strip.center);
+            if (d < nearestDist) { nearestDist = d; nearest = strip; }
+          }
+          this._autolandTarget = nearest;
+          this._autolandThrottle = this._physics.throttle;
+          this._autolandActive = true;
+          this._hud.showMessage('AUTOLAND ENGAGED', 3000);
+        } else {
+          this._autolandActive = false;
+          this._input.setThrottle(this._autolandThrottle);
+          this._hud.showMessage('AUTOLAND DISENGAGED', 2000);
+        }
+      }
+    }
+
+    // Parachute (Cirrus CAPS)
     if (this._currentAircraftKey === 'cirrusVisionJet' && input.wasJustPressed('KeyP')) {
-      this._parachuteDeployed = true;
-      this._hud.showMessage('PARACHUTE DEPLOYED', 5000);
-      this._physics.velocity.y = Math.max(this._physics.velocity.y, -5);
+      if (!this._parachuteDeployed) {
+        this._parachuteDeployed = true;
+        this._hud.showMessage('⚠ CAPS DEPLOYED', 5000);
+      }
     }
 
     // Bomb bay door (B52)

@@ -69,6 +69,9 @@ export class AircraftPhysics {
   }
 
   _updateFixedWing(dt, config, weather, terrainHeight) {
+    // Sync throttle from pilot/autopilot input
+    this.throttle = this._currentAxes ? (this._currentAxes.throttle || 0) : 0;
+
     const gravity = new THREE.Vector3(0, -9.81 * config.mass, 0);
 
     // Aircraft orientation vectors
